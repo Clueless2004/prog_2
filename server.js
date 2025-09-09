@@ -1,54 +1,68 @@
 const express = require("express");
-const cors = require("cors");
+const mysql = require("mysql2");
 const bodyParser = require("body-parser");
-const { createClient } = require("@supabase/supabase-js");
+const cors = require("cors");
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// 🔑 Get these from your Supabase project settings
-const SUPABASE_URL = "https://fkxnxuhsakdiqgtfvlis.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZreG54dWhzYWtkaXFndGZ2bGlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczODU5MDcsImV4cCI6MjA3Mjk2MTkwN30.y-YwTtcFfS3hO2an_rTyYBVIHTmH_1eqwo5EphVTz-8";
+// MySQL Connection
+const db = mysql.createConnection({
+  host: "localhost",
+  user: "root",   
+  password: "a4cool@sql",  
+  database: "movies_db"
+});
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+db.connect(err => {
+  if (err) throw err;
+  console.log("MySQL Connected...");
+});
 
 // GET all movies
-app.get("/movies", async (req, res) => {
-  const { data, error } = await supabase.from("movies").select("*");
-  if (error) return res.status(500).json(error);
-  res.json(data);
+app.get("/movies", (req, res) => {
+  db.query("SELECT * FROM movies", (err, results) => {
+    if (err) throw err;
+    res.json(results);
+  });
 });
 
 // POST new movie
-app.post("/movies", async (req, res) => {
+app.post("/movies", (req, res) => {
   const { title, director, genre, release_year, rating } = req.body;
-  const { data, error } = await supabase.from("movies").insert([
-    { title, director, genre, release_year, rating }
-  ]);
-  if (error) return res.status(500).json(error);
-  res.json({ message: "Movie added!", data });
+  db.query(
+    "INSERT INTO movies (title, director, genre, release_year, rating) VALUES (?, ?, ?, ?, ?)",
+    [title, director, genre, release_year, rating],
+    (err, result) => {
+      if (err) throw err;
+      res.json({ message: "Movie added!", id: result.insertId });
+    }
+  );
 });
 
 // PUT update movie
-app.put("/movies/:id", async (req, res) => {
+app.put("/movies/:id", (req, res) => {
   const { id } = req.params;
   const { title, director, genre, release_year, rating } = req.body;
-  const { data, error } = await supabase
-    .from("movies")
-    .update({ title, director, genre, release_year, rating })
-    .eq("id", id);
-  if (error) return res.status(500).json(error);
-  res.json({ message: "Movie updated!", data });
+  db.query(
+    "UPDATE movies SET title=?, director=?, genre=?, release_year=?, rating=? WHERE id=?",
+    [title, director, genre, release_year, rating, id],
+    (err) => {
+      if (err) throw err;
+      res.json({ message: "Movie updated!" });
+    }
+  );
 });
 
 // DELETE movie
-app.delete("/movies/:id", async (req, res) => {
+app.delete("/movies/:id", (req, res) => {
   const { id } = req.params;
-  const { error } = await supabase.from("movies").delete().eq("id", id);
-  if (error) return res.status(500).json(error);
-  res.json({ message: "Movie deleted!" });
+  db.query("DELETE FROM movies WHERE id=?", [id], (err) => {
+    if (err) throw err;
+    res.json({ message: "Movie deleted!" });
+  });
 });
 
 // Start server
-app.listen(5000, () => console.log("🚀 Server running at http://localhost:5000"));
+app.listen(5000, () => console.log("Server running on http://localhost:5000"));
